@@ -1,0 +1,281 @@
+---
+title: "Plato's Pizza"
+author: "Agbasi Ikechukwu Christian"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+![Plato's Pizza](https://images.ctfassets.net/p80c52b4itd3/2wbQSTmCXwKWgkSlS4EJBd/4b77cd999457391f2203440d84502f5d/pizza.jpg)  
+
+### Introduction  
+
+Plato Pizza is a fictional Greek-inspired pizza place in New Jersey, United states of America.Things are going OK here at Plato's, but there's room for improvement. We've been collecting transaction data for the past year, but really haven't been able to put it to good use, Mario Maven (Manager, Plato's Pizza) want the following business questions to be answered from the insight derived from their [dataset](https://www.mavenanalytics.io/data-playground)   
+
+* What days  do we tend to be busiest both for number of orders and income?
+* How many pizzas are we making during peak days, days of the week and months?
+* What are our best and worst selling pizzas?
+* What's our average order value?
+* How well are we utilizing our seating capacity? (we have 15 tables and 60 seats)  
+
+The data contains four different dataset that contains datas about their order history and pizza types, They are as follows   
+
+**About the dataset**   
+
+This dataset contains 4 tables in CSV format
+
+* The Orders table contains the date & time that all table orders were placed
+* The Order Details table contains the different pizzas served with each order in the Orders table, and their quantities
+* The Pizzas table contains the size and price for each distinct pizza in the Order Details table, as well as its broader pizza type
+* The Pizza Types table contains details on the pizza types in the Pizzas table, including their name as it appears on the menu, the category it falls under, and its list of ingredients  
+
+ **load packages needed R packages for this analysis**  
+ 
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(lubridate)
+library(scales)
+```
+
+**load the dataset**  
+
+```{r message=FALSE, warning=FALSE}
+order_details <- read.csv("order_details.csv")
+orders <- read.csv("orders.csv")
+pizza_types <- read.csv("pizza_types.csv")
+pizzas <- read.csv("pizzas.csv")
+```
+
+**view the individual dataset columns name**  
+
+```{r}
+colnames(order_details)
+colnames(orders)
+colnames(pizza_types)
+colnames(pizzas)
+```
+
+**Preview individual dataset data type**  
+
+```{r}
+str(order_details)
+str(orders)
+str(pizza_types)
+str(pizzas)
+```
+
+#### Joining of individual dataset  
+
+**Joining of orders table and order_details table using leftjoin function**  
+
+```{r message=FALSE, warning=FALSE}
+order_details_v2 <- left_join(order_details,orders, by= c("order_id"))
+```
+
+**joining of the pizzas table and pizza_type table using leftjoin function**  
+
+```{r message=FALSE, warning=FALSE}
+pizzas_v2 <- left_join(pizzas,pizza_types, by = c("pizza_type_id"))
+```
+
+**view the individual dataset columns name**   
+
+```{r}
+colnames(pizzas_v2)
+```
+
+```{r}
+colnames(order_details_v2)
+```
+
+**Joining of the pizzas_v2 data and order_details_v2 with the pizza_id dataframe using the leftjoin function**  
+ 
+```{r message=FALSE, warning=FALSE}
+maven_pizza <- left_join(order_details_v2,pizzas_v2, by = c("pizza_id"))
+```
+
+**Dataset columns name**  
+
+```{r}
+colnames(maven_pizza)
+```
+
+All data sets have been combined and ready for processing, New dataframe for months, days of the week and days  
+
+```{r message=FALSE, warning=FALSE}
+maven_pizza$months <- format(as.Date(maven_pizza$date),"%B")
+maven_pizza$days <- format(as.Date(maven_pizza$date), "%d")
+maven_pizza$day_of_the_week <- format(as.Date(maven_pizza$date),"%A")
+```
+
+**Dataset columns name**
+
+```{r}
+colnames(maven_pizza)
+```
+
+#### Verification for an potential outlier in the dataset   
+
+```{r}
+table(maven_pizza$price)
+```
+
+```{r}
+table(maven_pizza$quantity)
+```
+
+#### Analysis of data set to use our insight to gain business insight and improve productivity  
+
+**Total revenue**  
+
+```{r}
+maven_pizza %>% 
+  summarise(Revenue = sum(quantity*price))
+```
+
+**Total Order**  
+
+```{r}
+maven_pizza %>% 
+  summarise(Orders = sum(quantity))
+```
+
+
+**Average Order price**
+
+```{r}
+maven_pizza %>% 
+  summarise(Avg_order_price = mean(quantity*price))
+```
+
+**Number of pizza types**  
+```{r}
+maven_pizza %>% 
+  summarise(types_of_pizza = n_distinct(name))
+```
+
+
+
+**What days of the week do we tend to be busiest both for number of orders and revenue**  
+
+* Busiest day of the week for number of orders placed
+
+```{r}
+maven_pizza %>% 
+  mutate(week_days = wday(date, label = TRUE)) %>% 
+  group_by(week_days,category) %>% 
+  summarise(busiest_days_by_orders = sum(quantity)) %>% 
+  arrange(-busiest_days_by_orders) %>% 
+  ggplot(aes(x = week_days, y = busiest_days_by_orders, fill = category))+
+  geom_col()+
+  theme(text = element_text(size = 9),element_line(size =1))+
+  labs(title = "Number of orders placed within the days of the Week")
+```
+
+From the insight, **Thursday**, **Saturday** and **friday** has the highest number of orders within the week days ranging from **7478**,**7493** and **8242** orders respectively. While on the other hands, **Sunday** and **Monday** has the lowest number of orders within the week days ranging from **6035** and **6485** respectively  
+
+* Busiest day of the week for revenue generated
+
+```{r}
+maven_pizza %>% 
+  mutate(week_days = wday(date, label = TRUE)) %>% 
+  group_by(week_days,category) %>% 
+  summarise(busiest_days_by_revenue = sum(quantity*price)) %>% 
+  arrange(-busiest_days_by_revenue) %>% 
+  ggplot(aes(x = week_days, y = busiest_days_by_revenue, fill = category))+
+  geom_col()+
+    scale_y_continuous(labels = function(x) format(x, scientific = FALSE))+
+  theme(text = element_text(size = 9),element_line(size =1))+
+  labs(title = "Amount of revenue generated within the days of the Week")
+```
+
+From the insight, **Thursday**, **Saturday** and **friday** generated the highest number of revenue within the week days ranging from **$123528**,**$123182** and **$136074** orders respectively. While on the other hands, **Sunday** and **Monday** has the lowest number of orders within the week days ranging from **$99204** and **$107330** respectively  
+
+**Percentage of Order by pizza categories**   
+
+```#{r}
+ maven_pizza %>%
+  group_by(category) %>%
+  summarize(Frequency = n()) %>%
+  mutate(Percent = paste(round(Frequency / dims[1] * 100,0),"%"))
+```
+
+
+**Graphical representation of number of pizza ordered by pizza category**  
+
+```{r}
+ggplot(maven_pizza, aes(x = category)) +  
+        geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        scale_y_continuous(labels=percent)+
+        theme(legend.title = element_text(size = 12),
+        legend.text = element_text(size = 12))+
+        labs(title = "Percentage of pizza ordered by their category")
+```
+
+From our graph, **classic pizza** category has the most number of order placed which represent **14579(30%)** of total order while **chicken pizza** category has the lowest number of order placed at **10815(22%)** of the total orders  
+
+**Graphical representation of number of pizza ordered by pizza size**  
+
+```{r}
+ggplot(maven_pizza, aes(x = size)) +  
+        geom_bar(aes(y = (..count..)/sum(..count..))) + 
+        scale_y_continuous(labels=percent)+
+        theme(legend.title = element_text(size = 12),
+        legend.text = element_text(size = 12))+
+        labs(title = "Percentage of pizza ordered by their size")
+```
+
+**Best and worst selling pizza**
+
+* Top 10 best selling pizza
+```{r}
+maven_pizza %>% 
+  group_by(name) %>% 
+  summarise(total_price = sum(quantity*price)) %>% 
+  arrange(-total_price) %>% 
+  print(n = 10) 
+```
+
+* Top 10 worst selling pizza   
+```{r}
+maven_pizza %>% 
+  group_by(name) %>% 
+  summarise(total_price = sum(quantity*price)) %>% 
+  arrange(total_price) %>% 
+  print(n = 10)
+```
+
+**Visualization of pizza sales by their revenue**  
+
+```{r}
+maven_pizza %>% 
+  group_by(name) %>% 
+  summarise(total_revenue = sum(quantity*price)) %>% 
+  ggplot(aes(x = name, y = total_revenue))+
+  geom_col()+
+  coord_flip() +
+  labs(title = "Pizza names and its total revenue")
+```
+
+**Revenue by Months by category of pizza**  
+
+```{r}
+maven_pizza %>% 
+  group_by(months) %>% 
+  summarise(monthly_revenue = sum(quantity*price)) %>% 
+  arrange(-monthly_revenue) %>% 
+  ggplot(aes(x = months, y = monthly_revenue ))+
+  geom_col()+
+   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  labs(title = "Monthly revenue by pizza category")
+```
+
+From the graph, revenue generation ranges from above 60k to 72k per month, The month of **July** recorded the highest amount in revenue at **$72,558** while **October** recorded the lowest amount in revenue at **$64028**  
+
+**How well are we utilizing our seating capacity**  
+
+The seat available presently, seems to be enough from our analyses, we currently have **15 Tables** and **60 Chairs** .
+Averaging one order per table, we only have about **80% of the capacity only 2 to 7 times in a month**, and likewise, Averaging one pizza per chair,we only recorded only once that the number of orders (64orders) was over the number of available seats (60 chairs)
